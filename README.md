@@ -10,7 +10,6 @@ An interface can easily control the BananaCam local/remote server by sending spe
 The UNIX socket are located in /tmp/ under the name of:
 
 camera_control.sock 	    ==> communication socket
-
 camera_control_data.sock    ==> data socket (liveview)
 
 Those path can be easily changed in the file ./headers/camera_control.h
