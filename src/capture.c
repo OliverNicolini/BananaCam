@@ -21,6 +21,7 @@
 
 int		capture(t_cam *c, char *root_path)
 {
+  static int	i = -1;
   int		fd;
   int		retval;
   CameraFile	*file;
@@ -31,7 +32,9 @@ int		capture(t_cam *c, char *root_path)
   char		*message;
   char		*full_path;
   char		*tmp;
+  unsigned int	t;
 
+  i++;
   retval = gp_camera_capture(c->camera, GP_CAPTURE_IMAGE, &camera_file_path, c->context);
 
   if (retval < GP_OK) {
@@ -39,7 +42,10 @@ int		capture(t_cam *c, char *root_path)
     return (GP_ERROR);
   }
 
-  asprintf(&full_path, "%s%s", root_path, camera_file_path.name);
+  t = (unsigned)time(NULL);
+
+  asprintf(&full_path, "%s%u_%i.%s", root_path, t, i,
+	   get_extension(camera_file_path.name));
 
   asprintf(&tmp, "Capturing to file %s\n", full_path);
   creat_and_send_message(INFO, NULL, NULL, tmp, c);
@@ -92,7 +98,8 @@ int		capture(t_cam *c, char *root_path)
       {
 	camera_file_path = *(CameraFilePath*)data;
 
-	asprintf(&full_path, "%s%s", root_path, camera_file_path.name);
+	asprintf(&full_path, "%s%u_%i.%s", root_path, t, i,
+	   get_extension(camera_file_path.name));
 
 	asprintf(&tmp, "Capturing to file %s\n", full_path);
 	creat_and_send_message(INFO, NULL, NULL, tmp, c);

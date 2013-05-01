@@ -47,7 +47,7 @@ void			signal_inib()
   act.sa_handler = signal_handler;
   sigemptyset(&act.sa_mask);
   act.sa_flags = 0;
-  i = 1;
+  i = 3;
   while (i < 32)
     {
       if (i != 11)

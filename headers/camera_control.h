@@ -153,6 +153,7 @@ char		**str_to_wordtab(char *buff, char c);
 int		stw_letter_count(char *buff, int position, char c);
 int		stw_word_count(char *buff, char c);
 char		*stw_str_n_cpy(char *str, int position, int len);
+char		*get_extension(char *filename);
 
 /*		capture			*/
 

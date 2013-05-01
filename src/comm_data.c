@@ -76,7 +76,7 @@ void		data_serv_working_loop(t_serv_comm *s)
   if (s->sock_serv > s->bigger_fd)
     s->bigger_fd = s->sock_serv;
 
-  if (select((s->bigger_fd + 1), &(s->rd_fds),
+  if (select((s->sock_serv + 1), &(s->rd_fds),
 	     NULL, NULL, NULL) == -1)
     fprintf(stderr, "Select Error");
   if (FD_ISSET(s->sock_serv, &(s->rd_fds)))

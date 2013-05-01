@@ -96,3 +96,15 @@ char		**str_to_wordtab(char *buff, char c)
   dest[j] = NULL;
   return (dest);
 }
+
+
+char		*get_extension(char *filename)
+{
+  char		*extension;
+
+  extension = strrchr(filename, '.');
+  if (!extension || strlen(extension) == strlen(filename))
+    return (NULL);
+  return (extension + 1);
+}
+
