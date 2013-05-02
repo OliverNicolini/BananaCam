@@ -20,14 +20,14 @@
 #ifndef __CAMERA_CONTROL_H__
 #define __CAMERA_CONTROL_H__
 
-#include <pthread.h>
-
 #ifndef __APPLE__
 
 #include <sys/prctl.h>
+#include <libudev.h>
 
 #endif
 
+#include <pthread.h>
 #include <signal.h>
 #include <string.h>
 #include <sys/types.h>
@@ -36,15 +36,16 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <dlfcn.h>
 #include <sys/un.h>
-#include <unistd.h>
-#include <stdlib.h>
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <stdlib.h>
+#include <locale.h>
 #include <gphoto2/gphoto2.h>
 #include <gphoto2/gphoto2-camera.h>
 
@@ -57,24 +58,47 @@ struct		s_func
   t_func	*next;
 };
 
+struct		s_message_queue
+{
+  char		*command;
+  char		*msg;
+  char		**param;
+  int		code;
+  t_message_queue	*next;
+};
+
+struct		s_camera_usb_dev
+{
+  char		*vendor_id;
+  char		*product_id;
+  char		*vendor;
+  char		*product;
+  int		pluggued;
+  char		*node;
+};
+
 struct		s_cam
 {
-  Camera	*camera;
-  GPContext	*context;
-  int		ret;
-  char		*folder_path;
-  int		active_sock;
-  t_serv_comm	*sock_struct;
-  t_serv_comm	*data_sock_struct;
-  t_func	*first_func_ptr;
-  char		*camera_value_list;
-
+  Camera		*camera;
+  GPContext		*context;
+  int			ret;
+  char			*folder_path;
+  int			active_sock;
+  t_serv_comm		*sock_struct;
+  t_serv_comm		*data_sock_struct;
+  t_func		*first_func_ptr;
+  char			*camera_value_list;
+  t_message_queue	*first_msg;
   pthread_mutex_t	liveview_mutex;
   pthread_cond_t	liveview_condvar;
   pthread_t		liveview_thread;
   int			liveview;
   int			liveview_fps;
   int			liveview_fps_time;
+  t_camera_usb_dev	*cam_usb;
+
+  int		(*init_cam)(t_cam *c);
+  void		(*add_func_ptr_list)(t_cam *c, char *name, int (*func_ptr)(t_cam *c, char **param));
 };
 
 struct			s_serv_comm
@@ -118,6 +142,7 @@ struct			s_serv_clients
 
 void		*init_comm(t_cam *c, char *path);
 int		exec_command(t_cam *c, char *command, char **param);
+void		add_func_ptr_list(t_cam *c, char *name, int (*func_ptr)(t_cam *c, char **param));
 
 /*		comm			*/
 
@@ -183,10 +208,20 @@ char		*get_widget_choices(t_cam *c, CameraWidget *widget);
 char		*get_widget_children(t_cam *c, CameraWidget *widget, char *info);
 int		lookup_widget(CameraWidget*widget, const char *key, CameraWidget **child);
 
+/*             eject			*/
+
+int		eject(t_cam *c, char **param);
+
 #ifdef __APPLE__
 
 void		*initUSBDetect(void *main_struct);
 int		usbDetect();
+
+#endif
+
+#ifndef __APPLE__
+
+void		*linux_monitor_usb(void *obj);
 
 #endif
 

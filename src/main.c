@@ -17,6 +17,11 @@
 **
 */
 
+#include <gphoto2/gphoto2-port.h>
+#include <gphoto2/gphoto2-port-info-list.h>
+#include <gphoto2/gphoto2-port-portability.h>
+
+
 #include "camera_control.h"
 
 void error_func (GPContext *context, const char *format, va_list args, void *data) {
@@ -56,28 +61,66 @@ void			signal_inib()
     }
 }
 
+int		init_cam(t_cam *c)
+{
+  gp_camera_new(&c->camera);
+  c->context = gp_context_new();
+  c->ret = gp_camera_init(c->camera, c->context);
+  return (c->ret);
+}
+
 int		init(t_cam *c)
 {
+  CameraAbilities abilities;
+  GPPortInfo		info;
+  char			*path;
+  char			*bus;
+  char			*device;
+
   c->liveview = 0;
   c->liveview_fps = 30;
   c->liveview_fps_time = 1000000 / 30;
+  c->cam_usb = NULL;
   pthread_mutex_init(&c->liveview_mutex, NULL);
   pthread_cond_init(&c->liveview_condvar, NULL);
   c->folder_path = strdup("/tmp/");
   c->camera_value_list = NULL;
-
+  c->first_msg = NULL;
+  c->active_sock = 0;
   gp_context_set_error_func(c->context, (GPContextErrorFunc)error_func, NULL);
   gp_context_set_message_func(c->context, (GPContextMessageFunc)message_func, NULL);
-
+  c->add_func_ptr_list = add_func_ptr_list;
+  c->init_cam = init_cam;
   gp_camera_new(&c->camera);
   c->context = gp_context_new();
   printf("Camera Init\n");
   c->ret = gp_camera_init(c->camera, c->context);
-  if (c->ret != GP_OK) {
-    printf("gp_camera_init: %d\n", c->ret);
-    return (GP_ERROR);
-  }
-  /*  get_initial_camera_values(t_cam *c); */
+  if (c->ret != GP_OK)
+    {
+      printf("gp_camera_init: %d\n", c->ret);
+      return (GP_ERROR);
+    }
+  else
+    {
+      gp_port_get_info (c->camera->port, &info);
+      gp_port_info_get_path(info, &path);
+
+      bus = strrchr(path, ':') + 1;
+
+      device = strrchr(bus, ',') + 1;
+
+      if (bus[3] == ',')
+	bus[3] = '\0';
+
+      gp_camera_get_abilities(c->camera, &abilities);
+      c->cam_usb = malloc(sizeof(*c->cam_usb));
+      asprintf(&c->cam_usb->node, "/dev/bus/usb/%s/%s", bus, device);
+      asprintf(&c->cam_usb->vendor_id, "%i", abilities.usb_vendor);
+      asprintf(&c->cam_usb->product_id, "%i", abilities.usb_product);
+      c->cam_usb->product = strdup(abilities.model);
+      c->cam_usb->pluggued = 1;
+      c->cam_usb->vendor = NULL;
+    }
   return (GP_OK);
 }
 
@@ -108,27 +151,32 @@ int		exec_command(t_cam *c, char *command, char **param)
   t_func	*tmp = NULL;
   int		flag = 0;
 
-  if (strcmp(command, "liveview") != 0 && c->liveview == 1)
+  if (c->cam_usb->pluggued != 0)
     {
-      printf("enter inside here\n");
-      c->liveview = 0;
-      flag = 1;
-      sleep(1);
-    }
-  tmp = c->first_func_ptr;
-  while (tmp != NULL)
-    {
-      if (strcmp(command, tmp->name) == 0)
+      if (strcmp(command, "liveview") != 0 && c->liveview == 1)
 	{
-	  tmp->func_ptr(c, param);
-	  break;
+	  printf("enter inside here\n");
+	  c->liveview = 0;
+	  flag = 1;
+	  sleep(1);
 	}
-      tmp = tmp->next;
+      tmp = c->first_func_ptr;
+      while (tmp != NULL)
+	{
+	  if (strcmp(command, tmp->name) == 0)
+	    {
+	      tmp->func_ptr(c, param);
+	      break;
+	    }
+	  tmp = tmp->next;
+	}
+      if (tmp == NULL)
+	generic_exec(c, command, param);
+      if (flag == 1)
+	liveview(c, NULL);
     }
-  if (tmp == NULL)
-    generic_exec(c, command, param);
-  if (flag == 1)
-    liveview(c, NULL);
+  else
+    printf("Camera ejected or disconnected\n");
   return (0);
 }
 
@@ -158,22 +206,34 @@ void		add_func_ptr_list(t_cam *c, char *name, int (*func_ptr)(t_cam *c, char **p
     }
 }
 
+void		load_module(t_cam *c, char *path)
+{
+  void		*handle;
+  void		(*set_command_list)(t_cam *c);
+
+  handle = dlopen(path, RTLD_LAZY);
+  *(void **) (&set_command_list) = dlsym(handle, "set_command_list");
+  (*set_command_list)(c);
+}
+
 int		main(int ac, char **av)
 {
   t_cam		*c;
+  pthread_t	usb_thread;
 
   ac = ac;
   av = av;
 
   #ifdef __APPLE__
 
-  //pthread_t	thread;
+  // pthread_t	thread;
 
   printf("Killing PTPCamera process\n");
   system("killall PTPCamera");
-  //pthread_create(&thread, NULL, initUSBDetect, (void *)c);
+  //  pthread_create(&thread, NULL, initUSBDetect, (void *)c);
 
   #endif
+
 
   signal_inib();
 
@@ -181,6 +241,15 @@ int		main(int ac, char **av)
   c->first_func_ptr = NULL;
   init(c);
   get_all_widget_and_choices(c);
+
+  #ifndef __APPLE__
+
+  pthread_create(&usb_thread, NULL, linux_monitor_usb, (void *)c);
+
+  #endif
+
+  /*load_module(c, "./modules/test.so");*/
+
   add_func_ptr_list(c, "capture", trigger_capture);
   add_func_ptr_list(c, "liveview", liveview);
   add_func_ptr_list(c, "auto_focus", auto_focus);
@@ -188,6 +257,7 @@ int		main(int ac, char **av)
   add_func_ptr_list(c, "get_liveviewfps", get_liveviewfps);
   add_func_ptr_list(c, "defaultpath", set_default_folder_path);
   add_func_ptr_list(c, "get_defaultpath", get_default_folder_path);
+  add_func_ptr_list(c, "eject", eject);
 
   pthread_create(&c->liveview_thread, NULL, liveview_launcher, (void*)c);
 

@@ -17,15 +17,12 @@
 **
 */
 
-#ifndef __TYPEDEF_H__
-#define __TYPEDEF_H__
+#include "camera_control.h"
 
-typedef struct	s_cam			t_cam;
-typedef struct	s_queue			t_queue;
-typedef struct	s_func			t_func;
-typedef	struct	s_serv_comm		t_serv_comm;
-typedef	struct	s_serv_clients		t_serv_clients;
-typedef	struct	s_message_queue		t_message_queue;
-typedef struct  s_camera_usb_dev	t_camera_usb_dev;
-
-#endif /* !__TYPEDEF_H__ */
+int		eject(t_cam *c, char **param)
+{
+  param = param;
+  gp_camera_exit(c->camera, c->context);
+  gp_camera_unref(c->camera);
+  c->cam_usb->pluggued = 0;
+}

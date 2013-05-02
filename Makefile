@@ -30,9 +30,14 @@ SRC		= 	$(SRC_DIR)main.c			\
 			$(SRC_DIR)capture.c			\
 			$(SRC_DIR)set_get_localconfig.c		\
 			$(SRC_DIR)set_get_remoteconfig.c	\
+			$(SRC_DIR)eject.c
 
 ifeq ($(UNAME), Darwin)
 SRC		+=	$(SRC_DIR)USBPrivateDataSample.c
+endif
+
+ifeq ($(UNAME), Linux)
+SRC		+=	$(SRC_DIR)linux_usb.c
 endif
 
 INC		=	-I. -I./headers/
@@ -50,7 +55,11 @@ CDEBUG          =       -g -ggdb
 RM		=	rm -Rf
 ECHO		=	echo -e
 
-LIB		=	-lgphoto2 -lpthread
+LIB		=	-lgphoto2 -lpthread -ldl -lgphoto2_port
+
+ifeq ($(UNAME), Linux)
+LIB		+=	-ludev
+endif
 
 ifeq ($(UNAME), Darwin)
 LIB		+=	-framework IOKit -framework CoreFoundation
@@ -62,7 +71,7 @@ $(NAME)		:	$(OBJ)
 
 clean		:
 			-@$(RM) $(OBJ)
-			-@$(RM) *~
+			-@$(RM) *~ $(SRC_DIR)*~
 			-@$(RM) \#*\#
 			@$(ECHO) '\033[0;35m> Directory cleaned\033[0m'
 

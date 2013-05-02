@@ -137,7 +137,11 @@ void		client_diconnected(t_serv_comm *s, int sock)
   t_serv_clients *c;
   t_serv_clients *tmp;
 
-  c = s->first_client;
+  s->first_client = 0;
+  s->bigger_fd = s->sock_serv;
+  pthread_cond_signal(&s->c->liveview_condvar);
+
+  /*  c = s->first_client;
   if (c)
     {
       if (c->sock == sock)
@@ -158,6 +162,65 @@ void		client_diconnected(t_serv_comm *s, int sock)
 	}
       tmp = c;
       c = c->next;
+      }*/
+}
+
+void	       message_queue_push(char *command, char *msg, char **param, int code, t_cam *c)
+{
+  t_message_queue *tmp;
+
+  if (c->first_msg == NULL)
+    {
+      c->first_msg = malloc(sizeof(*c->first_msg));
+      c->first_msg->next = NULL;
+      c->first_msg->command = command;
+      c->first_msg->msg = msg;
+      c->first_msg->param = param;
+      c->first_msg->code = code;
+    }
+  else
+    {
+      tmp = c->first_msg;
+      while (tmp->next != NULL)
+	tmp = tmp->next;
+      tmp->next = malloc(sizeof(*tmp->next));
+      tmp = tmp->next;
+      tmp->next = NULL;
+      tmp->command = command;
+      tmp->msg = msg;
+      tmp->param = param;
+      tmp->code = code;
+    }
+}
+
+t_message_queue	*message_queue_pop(t_cam *c)
+{
+  t_message_queue *tmp;
+  if (c->first_msg != NULL)
+    {
+      tmp = c->first_msg;
+      c->first_msg = c->first_msg->next;
+      return (tmp);
+    }
+  else
+    return (NULL);
+}
+
+void		parse_and_push_message(char *buff, t_cam *c)
+{
+  int		code = 0;
+  char		*message = NULL;
+  char		*command = NULL;
+  char		**param = NULL;
+  int		i = 0;
+  char		**msg;
+
+  msg = str_to_wordtab(buff, '\n');
+  while (msg && msg[i] != NULL)
+    {
+      param = parse_message(msg[i], &code, &command, &message);
+      message_queue_push(command, message, param, code, c);
+      i++;
     }
 }
 
@@ -168,46 +231,50 @@ void		interpret_and_exec(char *buff, t_cam *c)
   char		*command = NULL;
   char		**param = NULL;
   int		i = 0;
+  t_message_queue *tmp;
 
-  param = parse_message(buff, &code, &command, &message);
-
-  if (code == OK)
-    printf("OK:\t\t%s\n", (message == NULL ? " NULL" : message));
-  else if (code == KO)
-    printf("KO:\t\t%s\n", (message == NULL ? " NULL" : message));
-  else if (code == WRONG_COMMAND)
-    printf("WRONG_COMMAND:\t\t%s", (message == NULL ? " NULL" : message));
-  else if (code == BAD_PARAMETERS)
+  while (c->first_msg != NULL)
     {
-      printf("OK:\t\t%s | bad param: ", (message == NULL ? " NULL" : message));
-      while (param[i] != NULL)
-	{
-	  printf("%s | ", param[i]);
-	  i++;
-	}
-      printf("\n");
-    }
-  else if (code == WAIT_RESPONSE)
-    printf("WAIT_RESPONSE:\t\t%s", (message == NULL ? " NULL" : message));
-  else if (code == COMPLETE)
-    printf("COMPLETE:\t\t%s", (message == NULL ? " NULL" : message));
-  else if (code == EXEC)
-    {
-      i = 0;
-      printf("EXEC:\t\t%s ==> ", (command == NULL ? "NULL" : command));
-      while (param[i] != NULL)
-	{
-	  printf("%s | ", param[i]);
-	  i++;
-	}
-      printf("## %s\n", (message == NULL ? " NULL" : message));
+      tmp = message_queue_pop(c);
 
-      if (command)
-	exec_command(c, command, param);
+      if (tmp->code == OK)
+	printf("OK:\t\t%s\n", (tmp->msg == NULL ? " NULL" : tmp->msg));
+      else if (tmp->code == KO)
+	printf("KO:\t\t%s\n", (tmp->msg == NULL ? " NULL" : tmp->msg));
+      else if (tmp->code == WRONG_COMMAND)
+	printf("WRONG_COMMAND:\t\t%s", (tmp->msg == NULL ? " NULL" : tmp->msg));
+      else if (tmp->code == BAD_PARAMETERS)
+	{
+	  printf("OK:\t\t%s | bad param: ", (tmp->msg == NULL ? " NULL" : tmp->msg));
+	  while (tmp->param[i] != NULL)
+	    {
+	      printf("%s | ", tmp->param[i]);
+	      i++;
+	    }
+	  printf("\n");
+	}
+      else if (tmp->code == WAIT_RESPONSE)
+	printf("WAIT_RESPONSE:\t\t%s", (tmp->msg == NULL ? " NULL" : tmp->msg));
+      else if (tmp->code == COMPLETE)
+	printf("COMPLETE:\t\t%s", (tmp->msg == NULL ? " NULL" : tmp->msg));
+      else if (tmp->code == EXEC)
+	{
+	  i = 0;
+	  printf("EXEC:\t\t%s ==> ", (tmp->command == NULL ? "NULL" : tmp->command));
+	  while (tmp->param[i] != NULL)
+	    {
+	      printf("%s | ", tmp->param[i]);
+	      i++;
+	    }
+	  printf("## %s\n", (tmp->msg == NULL ? " NULL" : tmp->msg));
 
+	  if (tmp->command)
+	    exec_command(c, tmp->command, tmp->param);
+
+	}
+      if (tmp->code == 0)
+	printf("//// UNKNOWN COMMAND \\\\\n");
     }
-  if (code == 0)
-    printf("//// UNKNOWN COMMAND \\\\\n");
 }
 
 void		check_modified_fd(t_serv_comm *s)
@@ -236,10 +303,8 @@ void		check_modified_fd(t_serv_comm *s)
 		buff[len - 1] = '\0';
 	      else
 		buff[len] = '\0';
+	      parse_and_push_message(buff, s->c);
 	      interpret_and_exec(buff, s->c);
-	      /*printf("read: %s\n", buff);
-		exec_command(s->c, buff);
-	      write(c->sock, "Received ;)", strlen("Received ;)")); */
 	      s->c->active_sock = 0;
 	      break;
 	    }
@@ -276,9 +341,8 @@ void		serv_working_loop(t_serv_comm *s)
     {
       reset_set_fd_to_monitor(s);
       if (select((s->bigger_fd + 1), &(s->rd_fds),
-		 NULL, NULL, NULL) == -1)
-	fprintf(stderr, "Select Error");
-
+		  NULL, NULL, NULL) == -1)
+	perror("select comm");
       check_modified_fd(s);
     }
 }

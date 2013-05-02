@@ -54,10 +54,7 @@ void		check_time(t_cam *c, struct timeval *start_time, struct timeval *end_time)
   if (difference.tv_sec == 0)
     {
       if (difference.tv_usec < c->liveview_fps_time)
-	{
-	  printf("fps_time = %i || diff = %i || sleep time = %i\n", c->liveview_fps_time, (int)difference.tv_usec, (int)(c->liveview_fps_time - difference.tv_usec));
-	  usleep(c->liveview_fps_time - difference.tv_usec);
-	}
+	usleep(c->liveview_fps_time - difference.tv_usec);
     }
 }
 
@@ -71,6 +68,8 @@ void		data_serv_working_loop(t_serv_comm *s)
   struct timeval time_beggining;
   struct timeval time_final;
 
+  s->first_client = NULL;
+
   FD_ZERO(&(s->rd_fds));
   FD_SET(s->sock_serv, &(s->rd_fds));
   if (s->sock_serv > s->bigger_fd)
@@ -78,9 +77,10 @@ void		data_serv_working_loop(t_serv_comm *s)
 
   if (select((s->sock_serv + 1), &(s->rd_fds),
 	     NULL, NULL, NULL) == -1)
-    fprintf(stderr, "Select Error");
+    perror("select data");
+
   if (FD_ISSET(s->sock_serv, &(s->rd_fds)))
-    serv_accept_new_connections_data(s);
+      serv_accept_new_connections_data(s);
 
   gp_file_new(&file);
 
@@ -100,6 +100,7 @@ void		data_serv_working_loop(t_serv_comm *s)
       len = asprintf(&header, "||>>%li>>||", size);
       gettimeofday(&time_final, NULL);
       check_time(s->c, &time_beggining, &time_final);
+
       if (write(s->first_client->sock, header, len) < 0)
 	{
 	  s->c->liveview = 0;
