@@ -22,7 +22,8 @@ NAME		= 	camera_control_server
 UNAME		:=	$(shell uname)
 
 SRC		= 	$(SRC_DIR)main.c			\
-			$(SRC_DIR)comm.c			\
+			$(SRC_DIR)comm_unix.c			\
+			$(SRC_DIR)comm_tcp.c			\
 			$(SRC_DIR)focus.c			\
 			$(SRC_DIR)utils.c			\
 			$(SRC_DIR)comm_data.c			\

@@ -128,7 +128,7 @@ void		*init_data_comm(t_cam *c, char *path)
   s->c = c;
   s->bigger_fd = 0;
   s->first_client = NULL;
-  serv_init_connect(s, path);
+  serv_init_connect_unix(s, path);
   while (1)
     {
       s->bigger_fd = 0;

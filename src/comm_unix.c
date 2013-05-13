@@ -333,7 +333,7 @@ void		reset_set_fd_to_monitor(t_serv_comm *s)
     }
 }
 
-void		serv_working_loop(t_serv_comm *s)
+void		serv_working_loop_unix(t_serv_comm *s)
 {
   s->state = ON;
   add_client_to_sock_monitor(s, s->sock_serv);
@@ -347,7 +347,7 @@ void		serv_working_loop(t_serv_comm *s)
     }
 }
 
-int		serv_init_connect(t_serv_comm *s, char *path)
+int		serv_init_connect_unix(t_serv_comm *s, char *path)
 {
   if ((s->sock_serv = socket(AF_UNIX, SOCK_STREAM, 0)) < 0)
     {
@@ -370,7 +370,7 @@ int		serv_init_connect(t_serv_comm *s, char *path)
   return (0);
 }
 
-void		*init_comm(t_cam *c, char *path)
+void		*init_comm_unix(t_cam *c, char *path)
 {
   t_serv_comm	*s;
 
@@ -379,8 +379,8 @@ void		*init_comm(t_cam *c, char *path)
   s->c = c;
   s->bigger_fd = 0;
   s->first_client = NULL;
-  serv_init_connect(s, path);
-  serv_working_loop(s);
+  serv_init_connect_unix(s, path);
+  serv_working_loop_unix(s);
   return (NULL);
 }
 

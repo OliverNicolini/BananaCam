@@ -177,7 +177,7 @@ This software depends on the followin libraries:
 
 -   For Linux and Mac OSX:
 
-    libgphoto2 libpthread
+    libgphoto2 libpthrea@@d
 
 -   For Mac OSX
 

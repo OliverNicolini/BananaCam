@@ -85,6 +85,7 @@ struct		s_cam
   char			*folder_path;
   int			active_sock;
   t_serv_comm		*sock_struct;
+  t_serv_comm		*sock_struct_tcp;
   t_serv_comm		*data_sock_struct;
   t_func		*first_func_ptr;
   char			*camera_value_list;
@@ -105,6 +106,7 @@ struct			s_serv_comm
 {
   int			sock_serv;
   struct sockaddr_un	serv_addr;
+  struct sockaddr_in	serv_addr_tcp;
   int			queue_size;
   int			state;
   fd_set		rd_fds;
@@ -140,18 +142,18 @@ struct			s_serv_clients
 
 /*		main			*/
 
-void		*init_comm(t_cam *c, char *path);
 int		exec_command(t_cam *c, char *command, char **param);
 void		add_func_ptr_list(t_cam *c, char *name, int (*func_ptr)(t_cam *c, char **param));
 
 /*		comm			*/
 
+void		*init_comm_unix(t_cam *c, char *path);
 char		*creat_message(int code, char *command, char **param, char *message);
 char		**parse_message(char *comm_protocol, int *code, char **command, char **message);
 void		creat_and_send_message(int code, char *command,
 				       char **param, char *message, t_cam *c);
-int		serv_init_connect(t_serv_comm *s, char *path);
-void		serv_working_loop(t_serv_comm *s);
+int		serv_init_connect_unix(t_serv_comm *s, char *path);
+void		serv_working_loop_unix(t_serv_comm *s);
 void		reset_set_fd_to_monitor(t_serv_comm *s);
 void		check_modified_fd(t_serv_comm *s);
 void		client_diconnected(t_serv_comm *s, int sock);
@@ -166,6 +168,14 @@ void		serv_accept_new_connections_data(t_serv_comm *s);
 void		check_time(t_cam *c, struct timeval *start_time, struct timeval *end_time);
 void		data_serv_working_loop(t_serv_comm *s);
 void		*init_data_comm(t_cam *c, char *path);
+
+/*		comm tcp       		*/
+
+void		interpret_header_tcp(char *buff, int sock, t_serv_comm *s);
+void		serv_accept_new_connections_tcp(t_serv_comm *s);
+void		serv_working_loop_tcp(t_serv_comm *s);
+int		serv_init_connect_tcp(t_serv_comm *s, int port);
+void		*init_comm_tcp(t_cam *c, int port);
 
 /*		autofocus		*/
 

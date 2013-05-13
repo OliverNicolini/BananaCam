@@ -261,7 +261,11 @@ int		main(int ac, char **av)
 
   pthread_create(&c->liveview_thread, NULL, liveview_launcher, (void*)c);
 
-  init_comm(c, UNIX_SOCKET_PATH);
+  if (ac == 2)
+    init_comm_tcp(c, atoi(av[1]));
+  else
+    init_comm_unix(c, UNIX_SOCKET_PATH);
+
   gp_camera_exit(c->camera, c->context);
   return (0);
 }
